@@ -1,0 +1,5 @@
+route_id,route_short_name,route_long_name,route_desc,route_type,route_color,route_text_color,route_url
+"ACTO001","1","Alinga Street - Gungahlin Place","Light Rail full service","0","BD0021","FFFFFF","https://www.transport.act.gov.au/getting-around/timetables/routes-by-number"
+"NIS","Not in Service","Not in Service","Light Rail not in service","0","BD0021","FFFFFF","https://www.transport.act.gov.au/getting-around/timetables/routes-by-number"
+"X1","Short Service","Well Station - Gungahlin Place","Partial Light Rail service","0","BD0021","FFFFFF","https://www.transport.act.gov.au/getting-around/timetables/routes-by-number"
+"X2","Short Service","EPIC - Alinga Street","Partial Light Rail service","0","BD0021","FFFFFF","https://www.transport.act.gov.au/getting-around/timetables/routes-by-number"
