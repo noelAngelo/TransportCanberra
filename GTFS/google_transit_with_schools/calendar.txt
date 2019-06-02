@@ -1,4 +1,0 @@
-service_id,monday,tuesday,wednesday,thursday,friday,saturday,sunday,start_date,end_date
-2019-COMBNXT-Weekday-01,1,1,1,1,1,0,0,20190509,20190705
-2019-COMBNXT-Saturday-01,0,0,0,0,0,1,0,20190511,20190629
-2019-COMBNXT-Sunday-01,0,0,0,0,0,0,1,20190512,20190630

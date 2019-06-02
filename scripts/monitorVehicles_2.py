@@ -1,0 +1,100 @@
+from google.transit import gtfs_realtime_pb2
+from google.protobuf.json_format import MessageToDict
+from pandas.io.json import json_normalize
+
+from sqlalchemy import inspect
+from sqlalchemy import MetaData
+from sqlalchemy import Table
+import sqlalchemy as db
+
+import time
+import os
+from apscheduler.schedulers.background import BackgroundScheduler
+
+import json
+import requests
+import numpy as np
+import pandas as pd
+import datetime
+
+# initialize scheduler
+scheduler = BackgroundScheduler()
+scheduler.start()
+
+def get_positions():
+    # initialise the feed message parser from Google
+    feed = gtfs_realtime_pb2.FeedMessage()
+
+    # get the response from the api
+    response = requests.get('http://files.transport.act.gov.au/feeds/lightrail.pb', allow_redirects=True)
+
+    # pass the response to the Parser
+    feed.ParseFromString(response.content)
+
+    # convert to dict from our original protobuf feed
+    dict_obj = MessageToDict(feed)
+
+    # get the position of the vehicles listed in the feed
+    vehicles = [vehicle for vehicle in dict_obj['entity'] if 'vehicle' in vehicle]
+    vehicle_positions = json_normalize(vehicles)
+
+    # clean the realtime feed
+    vehicle_positions = vehicle_positions.dropna(subset=['vehicle.trip.tripId', 'vehicle.position.latitude', 'vehicle.position.longitude'])
+    vehicle_positions = vehicle_positions.where((pd.notnull(vehicle_positions)), None)
+    vehicle_positions = vehicle_positions.reset_index(drop=True)
+    try:
+        vehicle_positions.drop('vehicle.currentStatus', axis=1, inplace=True)
+    except:
+        pass
+
+    return vehicle_positions
+
+def start_monitoring():
+    print('mointoring started')
+
+    # prepare rows to insert
+    vehicle_positions = get_positions()
+    try:
+        vehicle_positions.drop('vehicle.currentStatus', axis=1, inplace=True)
+    except:
+        pass
+
+    rows = vehicle_positions.to_dict(orient='id')
+    vehicle_list = [rows[idx] for idx, val in enumerate(rows)]
+
+    engine = db.create_engine('postgresql://postgres@localhost:5432/noelangelo')
+    # initiate metadata for insertion
+    metadata = MetaData(engine, reflect=True)
+    connection = engine.connect()
+    vehicle_pos = metadata.tables['vehicles']
+    ResultProxy = connection.execute(vehicle_pos.insert(),vehicle_list)
+    print('Inserted {} rows'.format(length))
+
+    # DEBUG:
+    print('Count: {}'.format(length))
+    for vehicle in vehicle_list:
+        print(' ID: {}, Trip Id: {}, VehicleId: {}, StopSequence: {}'.format(vehicle['id'], vehicle['tripId'], vehicle['vehicleId'], vehicle['currentStopSequence']))
+
+def schedule_monitoring():
+    job = scheduler.add_job(start_monitoring, 'interval', seconds=10)
+    print("job details: {}".format(job))
+
+if __name__ == '__main__':
+    pos = []
+    p = get_positions()
+
+    if p not in pos:
+        pos.append(p)
+        schedule_monitoring()
+    else:
+        print('No Updates')
+        pass
+
+    print('Press Ctrl+{0} to exit'.format('Break' if os.name == 'nt' else 'C'))
+    try:
+        # This is here to simulate application activity (which keeps the main thread alive).
+        while True:
+            time.sleep(5)
+    except (KeyboardInterrupt, SystemExit):
+        # Not strictly necessary if daemonic mode is enabled but should be done if possible
+        scheduler.shutdown()

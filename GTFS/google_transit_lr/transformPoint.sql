@@ -1,1 +1,0 @@
-ALTER TABLE transit_realtime ALTER COLUMN location SET DATA TYPE point USING (location::point);
