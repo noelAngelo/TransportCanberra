@@ -1,16 +1,10 @@
 # Import libraries
-from pandas.io.json import json_normalize
 from sodapy import Socrata
 from elasticsearch import Elasticsearch
 
 import json
-import requests
-import numpy as np
 import pandas as pd
-import datetime
-from datetime import timedelta
 import os, time
-import pytz
 import arrow
 
 # get credentials
