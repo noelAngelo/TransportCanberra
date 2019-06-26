@@ -12,6 +12,7 @@ confluent-kafka==1.0.1
 cryptography==2.6.1
 decorator==4.4.0
 defusedxml==0.6.0
+docutils==0.14
 elasticsearch==7.0.2
 entrypoints==0.3
 future==0.17.1
@@ -33,6 +34,7 @@ jupyter-core==4.4.0
 jupyter-highlight-selected-word==0.2.0
 jupyter-latex-envs==1.4.6
 jupyter-nbextensions-configurator==0.4.1
+lockfile==0.12.2
 lxml==4.3.4
 MarkupSafe==1.1.1
 mistune==0.8.4
@@ -56,6 +58,7 @@ Pygments==2.4.0
 pyOpenSSL==19.0.0
 pyrsistent==0.14.11
 PySocks==1.7.0
+python-daemon==2.2.3
 python-dateutil==2.8.0
 pytz==2019.1
 PyYAML==5.1.1
