@@ -46,9 +46,7 @@ def update_feed(dff, trips, stops):
     stops['stop_id'] = stops['stop_id'].astype(str)
 
     dff['arrival_time'] = dff['arrival_time'].apply(lambda x: arrow.get(x, tzinfo='Australia/Canberra'))
-    dff['arrival_date'] = dff['arrival_time'].apply(lambda x: x.date())
     dff['depature_time'] = dff['depature_time'].apply(lambda x: arrow.get(x, tzinfo='Australia/Canberra'))
-    dff['depature_date'] = dff['depature_time'].apply(lambda x: x.date())
     dff['timestamp'] = dff['timestamp'].apply(lambda x: arrow.get(x, tzinfo='Australia/Canberra'))
 
     # sort columns based on arrival time
@@ -56,7 +54,7 @@ def update_feed(dff, trips, stops):
 
     # drop columns
     dff = dff[
-        ['arrival_delay', 'arrival_time', 'arrival_date', 'depature_delay', 'depature_time', 'depature_date', 'stop_id',
+        ['arrival_delay', 'arrival_time', 'depature_delay', 'depature_time', 'stop_id',
          'stop_sequence', 'trip_id', 'timestamp']]
     trips = trips[['route_id', 'service_id', 'trip_id', 'trip_headsign', 'direction_id']]
     stops = stops[stops.columns[:2]]
@@ -74,13 +72,19 @@ def update_feed(dff, trips, stops):
 def push_to_es(dff, es):
     records_list = dff.to_dict(orient='records')
     if len(records_list) == 0:
-        return
+        print('empty records')
+        return False
     else:
         print('\nRecorded:')
+        prev_record = 0
         for record in records_list:
-            print("- Trip Id: {}", record['trip_id'])
-            es.index(index='trips_realtime', doc_type='lightrail', body=record)
+            if prev_record == record['trip_id']:
+                continue
+            else:
+                print("- Trip Id: {}".format(record['trip_id']))
+                es.index(index='trips_realtime', doc_type='lightrail', body=record)
         print("* * * *")
+        return True
 
 
 # -- END HELPER FUNCTIONS
@@ -88,7 +92,7 @@ def push_to_es(dff, es):
 
 # Main Function
 if __name__ == '__main__':
-
+    # print('Running app . . .')
     # get data from trips and stops
     trip_df = pd.read_csv('./GTFS/google_transit_lr/trips.csv')
     stop_df = pd.read_csv('./GTFS/google_transit_lr/stops.csv')
@@ -98,15 +102,19 @@ if __name__ == '__main__':
 
     # schedule to pull 2 datasets with a 15 second interval and compare
     while True:
+        # print('Calling early')
         early_call = update_feed(get_realtime_feed(), trip_df, stop_df)
         time.sleep(15)
         now = arrow.now()
+        # print('Calling late')
         late_call = update_feed(get_realtime_feed(), trip_df, stop_df)
         # compare combined dataframes
         df = pd.concat([late_call, early_call])
         df.sort_values(by='trip_id', inplace=True)
         df.drop_duplicates(subset=['trip_id', 'arrival_time'], inplace=True)
         filtered_df = df[df['depature_time'].map(lambda x: (now - x).seconds <= 15)]
+        filtered_df['arrival_time'] = filtered_df['arrival_time'].apply(lambda x: x.datetime)
+        filtered_df['depature_time'] = filtered_df['depature_time'].apply(lambda x: x.datetime)
+        filtered_df['timestamp'] = filtered_df['timestamp'].apply(lambda x: x.datetime)
         # push data to elastic
         push_to_es(filtered_df, es)
-
