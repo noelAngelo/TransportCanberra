@@ -9,6 +9,8 @@ from apscheduler.schedulers.background import BackgroundScheduler
 # from sqlalchemy import Table
 # import sqlalchemy as db
 
+from elasticsearch import Elasticsearch
+
 import json
 import requests
 import numpy as np
@@ -86,6 +88,7 @@ def updates_to_dataframe(updates):
     x['tripUpdate.trip.tripId'] = df['tripUpdate.trip.tripId']
     x['tripUpdate.timestamp'] = df['tripUpdate.timestamp']
     x['tripUpdate.delay'] = df['tripUpdate.delay']
+    x['id'] = df['id']
 
     # format date time
     x['arrival.time'] = x['arrival.time'].apply(lambda xx: datetime.datetime.fromtimestamp(int(xx)))
@@ -107,20 +110,64 @@ def validate(updates):
     else:
         return True
 
+def putDb():
+    engine = db.create_engine('postgresql://postgres@localhost:5432/noelangelo')
+    conn = engine.connect()
+
+    # Create MetaData instance
+    metadata = MetaData(engine, reflect=True)
+    
+    # Get Table
+    gtfsr_table = metadata.tables['gtfsr_feed']
+    postgres = pd.read_sql('SELECT * FROM public.gtfsr_feed LIMIT 100', engine)
+
+    for feed in list(df['Feed ID']):
+        if feed in list(postgres['Feed ID']):
+            print('Feed already exists')
+        else:
+            # Commit Insert
+            conn.execute(gtfsr_table.insert(),df.to_dict(orient='records'))
+            print('Inserted: ', len(df.to_dict(orient='records')))
+            break
+    return
+
+def insertToES(df, id, index, doc_type):
+    es=Elasticsearch([{'host':'localhost','port':9200, 'http_auth':('elastic', 'changeme')}])
+    for idx, record in enumerate(df.to_dict(orient='records'), 1):
+        es.index(index=index, doc_type=doc_type, body=record, id=record[id])
+        print(record[id])
+
 def start_monitoring():
     print('\nMonitoring started\n---------------------')
     
     feed = get_feed() # get raw feed
     updates = get_updates(feed) # get trip updates
-    dir = os.listdir()
+    
     if validate(updates):
         df = updates_to_dataframe(updates) # transform updates to dataframe
-        for i in range(300):
-            if 'updates'+str(i)+'.csv' in dir:
-                continue
-            else:
-                df.to_csv('updates'+str(i)+'.csv', index=False)
-                break
+        
+        df.columns = ['Arrival Delay', 'Arrival Time', 'Arrival Uncertainty',
+       'Departure Delay', 'Departure Time', 'Departure Uncertainty',
+       'Schedule Relationship', 'Stop ID', 'Stop Sequence', 'Trip ID',
+       'Request Timestamp', 'Delay', 'Feed ID']
+
+        df = df.set_index('Arrival Time')
+        start = datetime.datetime.now() - datetime.timedelta(minutes=1) 
+        end = datetime.datetime.now() + datetime.timedelta(minutes=1)
+        
+        start = datetime.datetime.strftime(start, '%H:%M')
+        end = datetime.datetime.strftime(end, '%H:%M')
+        print( start, end )
+
+        df = df.between_time(start, end)
+        df.reset_index(inplace=True)
+        df['Feed ID']=df['Feed ID'].astype(int)
+
+        id = 'Feed ID'
+        index = 'transportcanberra'
+        doc_type = 'lightrail'
+        insertToES(df, id, index, doc_type)
+         
     else:
         print('To be continued')
 
