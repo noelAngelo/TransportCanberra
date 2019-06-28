@@ -106,9 +106,9 @@ if __name__ == '__main__':
         df = pd.concat([late_call, early_call])
         df.sort_values(by='trip_id', inplace=True)
         df.drop_duplicates(subset=['trip_id', 'arrival_time'], inplace=True)
-        filtered_df = df[df['depature_time'].map(lambda x: (now - x).seconds <= 15)]
+        filtered_df = df[df['depature_time'].map(lambda x: (now - x).seconds <= 15 & (now - x).days > 0)]
         filtered_df['arrival_time'] = filtered_df['arrival_time'].apply(lambda x: x.datetime)
         filtered_df['depature_time'] = filtered_df['depature_time'].apply(lambda x: x.datetime)
-        filtered_df['timestamp'] = filtered_df['timestamp'].apply(lambda x: x.datetime)
+        filtered_df['timestamp'] = filtered_df['timestamp'].apply(lambda x: now.datetime)
         # push data to elastic
         push_to_es(filtered_df, es)
